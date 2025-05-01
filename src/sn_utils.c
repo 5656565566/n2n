@@ -23,8 +23,6 @@
 #include <stdio.h>              // for sscanf, snprintf, fclose, fgets, fopen
 #include <stdlib.h>             // for free, calloc, getenv
 #include <string.h>             // for memcpy, NULL, memset, size_t, strerror
-#include <sys/param.h>          // for MAX
-#include <sys/time.h>           // for timeval
 #include <sys/types.h>          // for ssize_t
 #include <time.h>               // for time_t, time
 #include "auth.h"               // for ascii_to_bin, calculate_dynamic_key
@@ -48,6 +46,8 @@
 #include <netinet/tcp.h>        // for TCP_NODELAY
 #include <sys/select.h>         // for FD_ISSET, FD_SET, select, FD_SETSIZE
 #include <sys/socket.h>         // for recvfrom, shutdown, sockaddr_storage
+#include <sys/param.h>          // for MAX
+#include <sys/time.h>           // for timeval
 #endif
 
 
@@ -545,7 +545,7 @@ static ssize_t sendto_sock(n2n_sn_t *sss,
     // if the connection is tcp, i.e. not the regular sock...
     if((socket_fd >= 0) && (socket_fd != sss->sock)) {
 
-        setsockopt(socket_fd, IPPROTO_TCP, TCP_NODELAY, &value, sizeof(value));
+        setsockopt(socket_fd, IPPROTO_TCP, TCP_NODELAY, (const char*)&value, sizeof(value));
         value = 1;
 #ifdef LINUX
         setsockopt(socket_fd, IPPROTO_TCP, TCP_CORK, &value, sizeof(value));

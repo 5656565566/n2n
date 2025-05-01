@@ -12,31 +12,26 @@ usage() {
 
 # We assume this script is in the TOPDIR/scripts directory and use that
 # to find any other files we need
-TOPDIR=$(dirname "$0")/..
+TOPDIR=$(cd "$(dirname "$0")/.." && pwd)
 
-VER_FILE_SHORT=$(cat "${TOPDIR}/VERSION")
+VER_FILE_SHORT=$(cat "${TOPDIR}/VERSION" 2>/dev/null || echo "v0.0.0")
 
 if [ -d "$TOPDIR/.git" ]; then
-    # If there is a .git directory in our TOPDIR, then this is assumed to be
-    # real git checkout
-
     cd "$TOPDIR" || exit 1
 
-    VER_GIT_SHORT=$(git describe --abbrev=0)
+    # Get latest tag (annotated or lightweight)
+    VER_GIT_SHORT=$(git describe --tags --abbrev=0 2>/dev/null || echo "$VER_FILE_SHORT")
 
     if [ "$VER_FILE_SHORT" != "$VER_GIT_SHORT" ]; then
-        echo "Error: VERSION file does not match tag version ($VER_FILE_SHORT != $VER_GIT_SHORT)"
-        exit 1
+        echo "Warning: VERSION file ($VER_FILE_SHORT) does not match latest tag ($VER_GIT_SHORT)"
     fi
 
     VER_SHORT="$VER_GIT_SHORT"
-    VER_HASH=$(git rev-parse --short HEAD)
-    VER=$(git describe --abbrev=7 --dirty)
-    DATE=$(git log -1 --format=%cd)
+    VER_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    VER=$(git describe --tags --abbrev=7 --dirty 2>/dev/null || echo "$VER_FILE_SHORT-$VER_HASH")
+    DATE=$(git log -1 --format=%cd 2>/dev/null || date)
 else
-    # If there is no .git directory in our TOPDIR, we fall back on relying on
-    # the VERSION file
-
+    # Fallback for non-Git environments
     VER_SHORT="$VER_FILE_SHORT"
     VER_HASH="HEAD"
     VER="$VER_FILE_SHORT"

@@ -22,7 +22,6 @@
 #include <stdbool.h>
 #include <stdlib.h>          // for free, atoi, calloc, strtol
 #include <string.h>          // for memcmp, memcpy, memset, strlen, strerror
-#include <sys/time.h>        // for gettimeofday, timeval
 #include <time.h>            // for time, localtime, strftime
 #include "config.h"          // for PACKAGE_BUILDDATE, PACKA...
 #include "n2n.h"
@@ -42,6 +41,7 @@
 #include <netdb.h>           // for addrinfo, freeaddrinfo, gai_strerror
 #include <sys/socket.h>      // for AF_INET, PF_INET, bind, setsockopt, shut...
 #include <syslog.h>          // for closelog, openlog, syslog, LOG_DAEMON
+#include <sys/time.h>        // for gettimeofday, timeval
 #endif
 
 

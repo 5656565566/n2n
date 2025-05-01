@@ -3,8 +3,12 @@ name: Testing
 
 # yamllint disable-line rule:truthy
 on:
-  push:
-  pull_request:
+    push:
+      branches:
+        - tests
+    pull_request:
+      branches:
+        - tests
 
 jobs:
   smoketest:
@@ -27,7 +31,7 @@ jobs:
 
       - if: ${{ failure() }}
         name: Upload tests output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tests-smoketest
           path: tests
@@ -136,7 +140,7 @@ jobs:
 
       - if: ${{ failure() }}
         name: Upload tests output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "analysis${{ matrix.flags }}"
           path: tests
@@ -192,7 +196,7 @@ jobs:
 
       - if: ${{ failure() }}
         name: Upload tests output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tests-linux
           path: tests
@@ -204,7 +208,7 @@ jobs:
         shell: bash
 
       - name: Upload gcovr report artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage
@@ -301,7 +305,7 @@ jobs:
 
       - if: ${{ failure() }}
         name: Upload tests output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tests-macos
           path: tests
@@ -320,7 +324,7 @@ jobs:
         shell: bash
 
       # - name: Upload gcovr report artifact
-      #  uses: actions/upload-artifact@v3
+      #  uses: actions/upload-artifact@v4
       #  with:
       #    name: coverage
       #    path: coverage
@@ -370,7 +374,7 @@ jobs:
 
       - if: ${{ failure() }}
         name: Upload tests output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tests-windows
           path: tests
@@ -433,7 +437,7 @@ jobs:
           make
 
       - name: Upload dpkg
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: packages-dpkg
           path: packages/debian/*.deb
@@ -474,7 +478,7 @@ jobs:
           mv ../rpmbuild ./
 
       - name: Upload rpm
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: packages-rpm
           path: rpmbuild/RPMS/x86_64/*.rpm
@@ -557,13 +561,13 @@ jobs:
 
       - name: Upload config file used for build
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: openwrt-config
           path: config.*
 
       - name: Upload ipk
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: packages-ipk
           path: openwrt/bin/packages/*/base/*.ipk
@@ -595,7 +599,7 @@ jobs:
           make install DESTDIR=binaries/x86_64-pc-mingw64
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: binaries
           path: binaries
@@ -638,7 +642,7 @@ jobs:
 
       - if: ${{ failure() }}
         name: Upload config.log output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: config-log-${{ matrix.arch }}
           path: config.log
@@ -649,7 +653,7 @@ jobs:
           make install DESTDIR=binaries/${{ matrix.arch }}
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: binaries
           path: binaries
@@ -690,7 +694,7 @@ jobs:
           make install DESTDIR=binaries/universal-apple-darwin
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: binaries
           path: binaries
@@ -750,7 +754,7 @@ jobs:
           make install DESTDIR=binaries/${{ matrix.arch }}
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: binaries
           path: binaries

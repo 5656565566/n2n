@@ -1,0 +1,212 @@
+name: Build and Release n2n
+
+on:
+  push:
+    tags:
+      - '*'
+  pull_request:
+    branches: [ iris, dev ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+            configure_flags: ""
+            artifact_suffix: linux
+          - os: macos-latest
+            cc: clang
+            configure_flags: "" # "--host=darwin"
+            artifact_suffix: macos
+          - os: windows-latest
+            cc: gcc
+            configure_flags: "--host=x86_64-w64-mingw32"
+            artifact_suffix: windows
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up MINGW64 (Windows)
+      if: startsWith(matrix.os, 'windows')
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-autotools
+          mingw-w64-x86_64-libtool
+          mingw-w64-x86_64-openssl
+          mingw-w64-x86_64-zstd
+          make
+          p7zip
+          git
+          base-devel
+
+    - name: Install dependencies (Linux)
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          autoconf \
+          automake \
+          build-essential \
+          libcap-dev \
+          libzstd-dev \
+          pkg-config \
+          flake8 \
+          shellcheck \
+          yamllint
+
+    - name: Install dependencies (macOS)
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        brew update
+        brew install automake libtool gcovr
+
+    - name: Set common environment variables
+      run: |
+          echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
+          echo "CONFIGURE_FLAGS=${{ matrix.configure_flags }}" >> $GITHUB_ENV
+
+    - name: Set Windows-specific environment variables
+      if: matrix.os == 'windows-latest'
+      run: |
+          echo "PATH=/mingw64/bin:/usr/local/bin:$PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/mingw64/lib/pkgconfig" >> $GITHUB_ENV
+
+    - name: Configure and Build (Windows)
+      if: startsWith(matrix.os, 'windows')
+      shell: msys2 {0}
+      run: |
+        ./scripts/hack_fakeautoconf.sh
+        make
+        mkdir -p release/tools release/tests
+        cp edge.exe supernode.exe release/
+        find tools/ -type f -name 'n2n-*.exe' -exec cp {} release/tools/ \;
+        find tools/ -type f -name 'tests-*.exe' -exec cp {} release/tests/ \;
+        7z a n2n-${{ github.ref_name }}-${{ matrix.artifact_suffix }}.zip release/*
+
+    - name: Configure and Build (Linux)
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        ./autogen.sh
+        ./configure $CONFIGURE_FLAGS
+        make
+        mkdir -p release/tools release/tests
+        cp edge supernode release/
+        find tools/ -maxdepth 1 -type f -executable ! -name '*.c' ! -name '*.o' -name 'n2n-*' -exec cp {} release/tools/ \;
+        find tools/ -maxdepth 1 -type f -executable ! -name '*.c' ! -name '*.o' -name 'tests-*' -exec cp {} release/tests/ \;
+        tar czvf n2n-${{ github.ref_name }}-${{ matrix.artifact_suffix }}.tar.gz release/*
+
+    - name: Configure and Build (macOS)
+      if: startsWith(matrix.os, 'macos')
+      continue-on-error: true
+      run: |
+        set +e
+        ./autogen.sh
+        ./configure $CONFIGURE_FLAGS
+        mkdir -p release/tools release/tests
+        make
+        cp edge supernode release/
+        find tools/ -type f -name 'n2n-*' ! -name '*.c' ! -name '*.o' -exec sh -c 'for f; do [ -x "$f" ] && cp "$f" release/tools/; done' sh {} +
+        find tools/ -type f -name 'tests-*' ! -name '*.c' ! -name '*.o' -exec sh -c 'for f; do [ -x "$f" ] && cp "$f" release/tests/; done' sh {} +
+        tar czvf n2n-${{ github.ref_name }}-${{ matrix.artifact_suffix }}.tar.gz release/*
+
+    - name: Upload artifacts
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v4
+      with:
+        name: n2n-binaries-${{ matrix.artifact_suffix }}
+        path: |
+          n2n-${{ github.ref_name }}-${{ matrix.artifact_suffix }}.*
+  
+  docker-build:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+    - name: Build and push Docker image
+      run: |
+        export VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+      
+        docker buildx build \
+        --platform linux/amd64,linux/arm64 \
+        --tag ${{ secrets.DOCKER_HUB_USERNAME }}/n2n:$VERSION \
+        --tag ${{ secrets.DOCKER_HUB_USERNAME }}/n2n:latest \
+        --push \
+        .
+
+        docker buildx build \
+        --platform linux/amd64,linux/arm64 \
+        --tag ${{ secrets.DOCKER_HUB_USERNAME }}/n2n:$VERSION \
+        --tag ${{ secrets.DOCKER_HUB_USERNAME }}/n2n:latest \
+        --output type=oci \
+        . > n2n-docker.tar
+      
+        mkdir -p docker-release
+        mv n2n-docker.tar docker-release/n2n-docker-oci-$VERSION.tar
+        gzip docker-release/n2n-docker-oci-$VERSION.tar
+
+    - name: Upload Docker artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: n2n-docker-image
+        path: docker-release/*.tar.gz
+
+  release:
+    needs: [build, docker-build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: n2n ${{ github.ref_name }}
+        body: |
+          Built for multiple platforms including Linux, macOS and Windows.
+          
+          - Multi-platform support
+          - Windows builds using MINGW64
+          - Docker images available
+
+          - 注意 此镜像为 OCI 标准 无法在老版本的 docker (20.10+ 之前) 中使用
+          - 如果需要请使用 docker pull 5656565566/n2n:latest 获取兼容性更好的镜像
+        files: |
+          artifacts/n2n-binaries-linux/n2n-${{ github.ref_name }}-linux.tar.gz
+          artifacts/n2n-binaries-macos/n2n-${{ github.ref_name }}-macos.tar.gz
+          artifacts/n2n-binaries-windows/n2n-${{ github.ref_name }}-windows.zip
+          artifacts/n2n-docker-image/n2n-docker-oci-*.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

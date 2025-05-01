@@ -30,6 +30,6 @@ LDLIBS_EXTRA=-lnetapi32 -lws2_32 -liphlpapi
 EOF
 
 cat <<EOF >include/config.h
-#define PACKAGE_VERSION "FIXME"
+#define PACKAGE_VERSION "iris"
 #define PACKAGE_BUILDDATE "$(date)"
 EOF

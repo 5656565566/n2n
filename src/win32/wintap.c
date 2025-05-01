@@ -3,7 +3,7 @@
 */
 
 #include "defs.h"
-#ifndef _WIN64
+#ifdef _WIN64
 #include <iphlpapi.h>
 #endif
 

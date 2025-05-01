@@ -143,21 +143,39 @@
 #elif defined(__WINDOWS__)
 
 #   if BYTE_ORDER == LITTLE_ENDIAN
+        /* MinGW (GCC on Windows) */
+#       if defined(__MINGW32__) || defined(__MINGW64__)
+#           define htobe16(x) __builtin_bswap16(x)
+#           define htole16(x) (x)
+#           define be16toh(x) __builtin_bswap16(x)
+#           define le16toh(x) (x)
 
-#       define htobe16(x) _byteswap_ushort(x)
-#       define htole16(x) (x)
-#       define be16toh(x) _byteswap_ushort(x)
-#       define le16toh(x) (x)
+#           define htobe32(x) __builtin_bswap32(x)
+#           define htole32(x) (x)
+#           define be32toh(x) __builtin_bswap32(x)
+#           define le32toh(x) (x)
 
-#       define htobe32(x) _byteswap_ulong(x)
-#       define htole32(x) (x)
-#       define be32toh(x) _byteswap_ulong(x)
-#       define le32toh(x) (x)
+#           define htobe64(x) (((uint64_t)htobe32(((uint32_t)(((uint64_t)(x)) >> 32))) & 0x00000000FFFFFFFFULL) | (((uint64_t)htobe32(((uint32_t)(x)))) << 32))
+#           define be64toh(x) (((uint64_t)be32toh(((uint32_t)(((uint64_t)(x)) >> 32))) & 0x00000000FFFFFFFFULL) | (((uint64_t)be32toh(((uint32_t)(x)))) << 32))
+#           define htole64(x) (x)
+#           define le64toh(x) (x)
+        /* MSVC (Visual Studio) */
+#       else
+#           define htobe16(x) _byteswap_ushort(x)
+#           define htole16(x) (x)
+#           define be16toh(x) _byteswap_ushort(x)
+#           define le16toh(x) (x)
 
-#       define htobe64(x) (((uint64_t)htobe32(((uint32_t)(((uint64_t)(x)) >> 32))) & 0x00000000FFFFFFFFULL) | (((uint64_t)htobe32(((uint32_t)(x)))) << 32))
-#       define be64toh(x) (((uint64_t)be32toh(((uint32_t)(((uint64_t)(x)) >> 32))) & 0x00000000FFFFFFFFULL) | (((uint64_t)be32toh(((uint32_t)(x)))) << 32))
-#       define htole64(x) (x)
-#       define le64toh(x) (x)
+#           define htobe32(x) _byteswap_ulong(x)
+#           define htole32(x) (x)
+#           define be32toh(x) _byteswap_ulong(x)
+#           define le32toh(x) (x)
+
+#           define htobe64(x) (((uint64_t)htobe32(((uint32_t)(((uint64_t)(x)) >> 32))) & 0x00000000FFFFFFFFULL) | (((uint64_t)htobe32(((uint32_t)(x)))) << 32))
+#           define be64toh(x) (((uint64_t)be32toh(((uint32_t)(((uint64_t)(x)) >> 32))) & 0x00000000FFFFFFFFULL) | (((uint64_t)be32toh(((uint32_t)(x)))) << 32))
+#           define htole64(x) (x)
+#           define le64toh(x) (x)
+#       endif
 
 #   elif BYTE_ORDER == BIG_ENDIAN
 
