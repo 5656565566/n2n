@@ -1,0 +1,56 @@
+# JNI Makefile for n2n supernode
+
+JAVA_HOME ?= C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot
+CC = gcc
+CFLAGS = -O2 -Wall -Iinclude -Isrc -I"$(JAVA_HOME)\include" -I"$(JAVA_HOME)\include\win32" -D_WIN32
+LDFLAGS = -shared -lws2_32 -liphlpapi
+
+# n2n source files needed for supernode
+SRCS = src/n2n_jni.c \
+       src/n2n.c \
+       src/sn_utils.c \
+       src/sn_management.c \
+       src/management.c \
+       src/json.c \
+       src/hexdump.c \
+       src/random_numbers.c \
+       src/pearson.c \
+       src/wire.c \
+       src/auth.c \
+       src/minilzo.c \
+       src/aes.c \
+       src/speck.c \
+       src/cc20.c \
+       src/curve25519.c \
+       src/tf.c \
+       src/transform_null.c \
+       src/transform_aes.c \
+       src/transform_tf.c \
+       src/transform_speck.c \
+       src/transform_cc20.c \
+       src/transform_lzo.c \
+       src/n2n_port_mapping.c \
+       src/n2n_regex.c \
+       src/sn_selection.c \
+       src/network_traffic_filter.c \
+       src/header_encryption.c \
+       src/edge_management.c \
+       src/edge_utils.c \
+       src/win32/edge_utils_win32.c \
+       src/win32/wintap.c \
+       src/win32/getopt.c \
+       src/win32/getopt1.c
+
+TARGET = n2n_jni.dll
+
+all: $(TARGET) java_compile
+
+$(TARGET): $(SRCS)
+	$(CC) $(CFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
+
+java_compile:
+	javac java/org/ntop/n2n/Supernode.java
+	jar cvfe n2n_supernode.jar org.ntop.n2n.Supernode -C java org
+
+clean:
+	del /f $(TARGET) n2n_supernode.jar java\org\ntop\n2n\*.class
