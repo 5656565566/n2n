@@ -1,11 +1,49 @@
 # JNI Makefile for n2n supernode
 
-JAVA_HOME ?= C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot
-CC = gcc
-CFLAGS = -O2 -Wall -Iinclude -Isrc -I"$(JAVA_HOME)\include" -I"$(JAVA_HOME)\include\win32" -D_WIN32
-LDFLAGS = -shared -lws2_32 -liphlpapi
+-include config.mak
 
-# n2n source files needed for supernode
+ifndef CONFIG_HOST
+$(error Please run ./configure)
+endif
+
+# JNI specific flags
+JNI_CFLAGS = -Iinclude -Isrc
+
+# Detect JNI platform
+ifeq ($(OS),Windows_NT)
+    JNI_PLATFORM = win32
+    TARGET_EXT = .dll
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Darwin)
+        JNI_PLATFORM = darwin
+        TARGET_EXT = .dylib
+    else
+        JNI_PLATFORM = linux
+        TARGET_EXT = .so
+    endif
+endif
+
+# Try to find JAVA_HOME if not set
+ifndef JAVA_HOME
+    ifneq ($(shell which java 2>/dev/null),)
+        # Basic attempt to find JAVA_HOME from java executable path
+        JAVA_HOME := $(shell java -XshowSettings:properties -version 2>&1 | grep java.home | awk '{print $$3}')
+    endif
+endif
+
+ifneq ($(JAVA_HOME),)
+    JNI_CFLAGS += -I"$(JAVA_HOME)/include" -I"$(JAVA_HOME)/include/$(JNI_PLATFORM)"
+endif
+
+# Inherit from main Makefile logic
+CFLAGS += $(JNI_CFLAGS) -fPIC
+LDFLAGS += -shared
+
+# Target name
+TARGET = n2n_jni$(TARGET_EXT)
+
+# n2n source files
 SRCS = src/n2n_jni.c \
        src/n2n.c \
        src/sn_utils.c \
@@ -29,28 +67,51 @@ SRCS = src/n2n_jni.c \
        src/transform_speck.c \
        src/transform_cc20.c \
        src/transform_lzo.c \
+       src/transform_zstd.c \
        src/n2n_port_mapping.c \
        src/n2n_regex.c \
        src/sn_selection.c \
        src/network_traffic_filter.c \
        src/header_encryption.c \
        src/edge_management.c \
-       src/edge_utils.c \
-       src/win32/edge_utils_win32.c \
-       src/win32/wintap.c \
-       src/win32/getopt.c \
-       src/win32/getopt1.c
+       src/edge_utils.c
 
-TARGET = n2n_jni.dll
+# Platform specific sources and libs
+ifneq (,$(findstring mingw,$(CONFIG_HOST_OS)))
+    SRCS += src/win32/edge_utils_win32.c \
+            src/win32/wintap.c \
+            src/win32/getopt.c \
+            src/win32/getopt1.c
+    LDLIBS += -lws2_32 -liphlpapi -lnetapi32
+else
+    ifeq ($(CONFIG_HOST_OS),linux)
+        SRCS += src/tuntap_linux.c
+    endif
+    ifeq ($(CONFIG_HOST_OS),darwin)
+        SRCS += src/tuntap_osx.c
+    endif
+    ifeq ($(CONFIG_HOST_OS),freebsd)
+        SRCS += src/tuntap_freebsd.c
+    endif
+endif
+
+OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET) java_compile
 
-$(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDFLAGS) $(LDLIBS)
 
-java_compile:
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+java_compile: $(TARGET)
 	javac java/org/ntop/n2n/Supernode.java
+	# Copy the native library into the package directory so it gets included in the jar
+	cp $(TARGET) java/org/ntop/n2n/
 	jar cvfe n2n_supernode.jar org.ntop.n2n.Supernode -C java org
 
 clean:
-	del /f $(TARGET) n2n_supernode.jar java\org\ntop\n2n\*.class
+	rm -f $(TARGET) n2n_supernode.jar $(OBJS)
+	rm -f java/org/ntop/n2n/*.class
+	rm -f java/org/ntop/n2n/$(TARGET)
